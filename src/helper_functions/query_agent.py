@@ -4,6 +4,7 @@ import asyncio
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
+import pandas as pd
 
 # OpenAI Agents SDK imports
 from agents import Agent, Runner, function_tool
@@ -38,6 +39,12 @@ class IngestFromFredArgs(BaseModel):
     """Arguments for FRED ingestion tool"""
     query: str
     country: str = "USA"
+
+
+class DisplayDataframeArgs(BaseModel):
+    """Arguments for dataframe display tool"""
+    indicator_id: str
+    preview_rows: int = 10
 
 
 class QueryAgent:
@@ -108,6 +115,14 @@ class QueryAgent:
             return self._extract_data_impl(indicator_id)
         
         @function_tool
+        def display_dataframe_preview(indicator_id: str, preview_rows: int = 10) -> str:
+            """
+            Display a preview of the time series data for a specific indicator.
+            Shows both metadata and a sample of the actual data in a formatted table.
+            """
+            return self._display_dataframe_preview_impl(indicator_id, preview_rows)
+        
+        @function_tool
         def ingest_from_fred(query: str, country: str = "USA") -> str:
             """
             Search FRED database and ingest new economic indicators with full time series data.
@@ -115,33 +130,13 @@ class QueryAgent:
             """
             return self._ingest_from_fred_impl(query, country)
         
-        # Create agent with updated system instructions
-        updated_instructions = """You are an intelligent economic data query agent. Your primary goal is to help users find and extract economic indicators from the FRED database.
-
-You have access to several tools:
-1. search_database - Search the local database for economic indicators
-2. extract_data - Extract time series data for specific indicators  
-3. ingest_from_fred - Search and ingest new data from FRED database
-
-Your workflow should be:
-1. First, search the local database for indicators matching the user's query
-2. INTELLIGENTLY EVALUATE the search results - look at the indicator names, descriptions, and similarity scores to determine if any are relevant to the user's request
-3. If you find relevant indicators (even with moderate similarity), extract and present the data
-4. If no relevant indicators are found, use the FRED ingestion tool to search for new data
-5. After ingestion, search the database again and evaluate the new results
-6. Present results or apologize if no relevant data is found
-
-IMPORTANT: Don't rely solely on similarity scores. Use your intelligence to assess whether an indicator matches what the user is asking for based on the name and description. For example:
-- "UNRATE" (Unemployment Rate) is clearly relevant for unemployment queries
-- "CPIAUCSL" (Consumer Price Index) is clearly relevant for inflation queries  
-- Even moderate similarity scores (0.5-0.7) can indicate highly relevant data
-
-Always be helpful, clear, and explain what you're doing at each step."""
+        # Get agent instructions from YAML configuration
+        agent_instructions = self.agent_config.get("QueryAgent_Instructions", "")
         
         agent = Agent(
             name="FRED Query Agent",
-            instructions=updated_instructions,
-            tools=[search_database, extract_data, ingest_from_fred]
+            instructions=agent_instructions,
+            tools=[search_database, extract_data, display_dataframe_preview, ingest_from_fred]
         )
         
         return agent
@@ -183,7 +178,7 @@ Always be helpful, clear, and explain what you're doing at each step."""
                     response += f"   Description: {result['description']}\n\n"
                 
                 response += "Please evaluate these indicators and determine if any are relevant to the user's query. "
-                response += "If relevant, use the extract_data tool with the appropriate indicator_id."
+                response += "If relevant, use the display_dataframe_preview tool to show the data to the user."
                 return response
             else:
                 return f"No indicators found in database after searching {search_attempts} variations. Consider using FRED ingestion to find new data."
@@ -224,6 +219,74 @@ Always be helpful, clear, and explain what you're doing at each step."""
             
         except Exception as e:
             return f"❌ Error extracting data: {str(e)}"
+    
+    def _display_dataframe_preview_impl(self, indicator_id: str, preview_rows: int = 10) -> str:
+        """Implementation of dataframe preview display"""
+        try:
+            print(f"📊 Displaying preview for indicator: {indicator_id}")
+            
+            # Extract the data first
+            result = extract_data(indicator_id)
+            if result is None:
+                return f"❌ Failed to extract data for indicator '{indicator_id}'. Please check the indicator ID."
+            
+            metadata, time_series = result
+            
+            # Create a DataFrame for better display
+            df = pd.DataFrame({
+                'Date': time_series.index,
+                'Value': time_series.values
+            })
+            
+            # Format the response with metadata and data preview
+            response = f"📊 **Data Preview: {metadata.get('Indicator Name', 'N/A')}**\n"
+            response += "=" * 80 + "\n\n"
+            
+            # Metadata section
+            response += f"**Indicator ID:** {metadata.get('Indicator ID', 'N/A')}\n"
+            response += f"**Geography:** {metadata.get('Geography', 'N/A')}\n"
+            response += f"**Frequency:** {metadata.get('Frequency', 'N/A')}\n"
+            response += f"**Description:** {metadata.get('Description', 'N/A')}\n\n"
+            
+            # Data summary
+            response += f"**Data Summary:**\n"
+            response += f"- Range: {time_series.index[0].strftime('%Y-%m-%d')} to {time_series.index[-1].strftime('%Y-%m-%d')}\n"
+            response += f"- Total Observations: {len(time_series)}\n"
+            response += f"- Non-null Values: {time_series.count()}\n"
+            response += f"- Latest Value: {time_series.iloc[-1]:.2f} ({time_series.index[-1].strftime('%Y-%m-%d')})\n\n"
+            
+            # Data preview table
+            response += f"**Data Preview (Last {preview_rows} observations):**\n"
+            response += "-" * 50 + "\n"
+            
+            # Get last N rows for preview
+            preview_data = df.tail(preview_rows)
+            
+            # Format as a nice table
+            response += f"{'Date':<12} {'Value':<15}\n"
+            response += "-" * 27 + "\n"
+            
+            for _, row in preview_data.iterrows():
+                date_str = row['Date'].strftime('%Y-%m-%d')
+                value_str = f"{row['Value']:.2f}" if pd.notna(row['Value']) else "N/A"
+                response += f"{date_str:<12} {value_str:<15}\n"
+            
+            response += "-" * 50 + "\n"
+            
+            # Statistics
+            response += f"\n**Quick Statistics:**\n"
+            response += f"- Mean: {time_series.mean():.2f}\n"
+            response += f"- Median: {time_series.median():.2f}\n"
+            response += f"- Min: {time_series.min():.2f} ({time_series.idxmin().strftime('%Y-%m-%d')})\n"
+            response += f"- Max: {time_series.max():.2f} ({time_series.idxmax().strftime('%Y-%m-%d')})\n"
+            response += f"- Standard Deviation: {time_series.std():.2f}\n"
+            
+            response += "\n" + "=" * 80
+            
+            return response
+            
+        except Exception as e:
+            return f"❌ Error displaying dataframe preview: {str(e)}"
     
     def _ingest_from_fred_impl(self, query: str, country: str = "USA") -> str:
         """Implementation of FRED data ingestion with full time series data"""
@@ -299,7 +362,6 @@ Always be helpful, clear, and explain what you're doing at each step."""
             
             if new_indicators:
                 # Update dictionary
-                import pandas as pd
                 new_df = pd.DataFrame(new_indicators)
                 
                 if os.path.exists(self.dict_file_path):
