@@ -46,3 +46,33 @@ country_resolution:
       output: United States
     - input: Deutschland
       output: Germany
+
+query_agent:
+  search_variations_template: |
+    Based on the user query "{query}", generate up to 3 different search variations that might find relevant economic indicators. 
+    Consider synonyms, related terms, and different phrasings.
+    
+    Examples:
+    - "unemployment" → ["unemployment rate", "jobless claims", "employment statistics"]
+    - "inflation" → ["consumer price index", "price level", "inflation rate"]
+    
+    Return only the search terms, one per line.
+
+  fred_query_rephrase_template: |
+    The user is looking for economic data with this query: "{query}"
+    
+    Rephrase this query to be more suitable for searching the FRED economic database.
+    Focus on standard economic terminology and indicators that would likely exist in a central bank database.
+    
+    Examples:
+    - "job market" → "employment statistics United States"
+    - "cost of living" → "consumer price index inflation"
+    
+    Return only the rephrased query.
+
+  max_search_attempts: 3
+
+  model_config:
+    model: "gpt-4o"
+    temperature: 0.3
+    max_tokens: 150
