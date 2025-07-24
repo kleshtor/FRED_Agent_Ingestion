@@ -1,0 +1,48 @@
+metadata:
+  version: "2.0"
+  author: "Aarushi A"
+  description: "Prompt configurations for FRED Agent SDK"
+  last_updated: "2025-07-22"
+
+economic_indicators:
+  system_instructions: |
+    You are an expert at explaining economic variables in simple language. 
+    You generate brief descriptions of economic indicators.
+    Keep your responses concise, professional, and accessible to non-economists.
+    Focus on what the indicator measures and why it's important.
+
+  user_prompt_template: |
+    Briefly describe the economic indicator: '{title}' 
+    for {country}, which is reported on a {frequency} basis. 
+    Here are examples of the expected format and style:
+
+    Example 1:
+    Input: Consumer Price Index for United States, reported monthly
+    Output: Measures the average change in prices paid by consumers for goods and services over time. This data is reported on a monthly basis. This key inflation indicator helps track purchasing power and cost of living changes, serving as a crucial metric for monetary policy decisions.
+
+    Example 2:
+    Input: Gross Domestic Product for Germany, reported quarterly  
+    Output: Represents the total monetary value of all finished goods and services produced within Germany's borders. This data is reported on a quarterly basis. This comprehensive economic indicator measures overall economic activity and growth, providing insights into the country's economic health and performance.
+
+  model_config:
+    model: "gpt-4o"
+    temperature: 0.2
+    max_tokens: 100
+
+country_resolution:
+  system_instructions: |
+    You are a smart assistant that normalizes user-entered or misspelled country names 
+    into the official names recognized by FRED (e.g., "United States", "Germany").
+    Correct typos, expand abbreviations, and resolve informal phrases.
+    Always return ONLY the official standardized country name, with no extra punctuation or explanations.
+
+  model_config:
+    model: "gpt-4o"
+    temperature: 0
+    max_tokens: 30
+
+  examples:
+    - input: US of A
+      output: United States
+    - input: Deutschland
+      output: Germany

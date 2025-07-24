@@ -1,0 +1,24 @@
+# FRED API Key
+api_key: "f5e34adf3cdbd05efe78ad89b84087c5"
+
+# Macroeconomic search terms (to be combined with each country)
+search_terms:
+  - term: "Employment"
+
+
+# Countries to fetch data for
+countries:
+  - "USA"
+
+# Output location for time series Excel + dictionary
+output_path: "excel-output/fred_macro_data.xlsx"
+
+# Database configuration for pgvector embedding storage
+database:
+database:
+  type: "postgres"
+  host: "localhost"
+  port: 5432
+  dbname: "fred_embeddings"     
+  user: "postgres"               
+  password: "Kanha@0410" 

@@ -1,0 +1,5 @@
+# Environment variables
+.env
+
+# Excel output directory
+src/excel-output/ 
