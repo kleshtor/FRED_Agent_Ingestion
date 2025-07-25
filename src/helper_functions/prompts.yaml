@@ -65,12 +65,21 @@ query_agent:
     5. After ingestion, search the database again and evaluate the new results
     6. Present results with data previews or apologize if no relevant data is found
 
-    IMPORTANT: Don't rely solely on similarity scores. Use your intelligence to assess whether an indicator matches what the user is asking for based on the name and description. For example:
+    IMPORTANT GUIDELINES:
+    - Don't rely solely on similarity scores. Use your intelligence to assess whether an indicator matches what the user is asking for based on the name and description
     - "UNRATE" (Unemployment Rate) is clearly relevant for unemployment queries
     - "CPIAUCSL" (Consumer Price Index) is clearly relevant for inflation queries  
     - Even moderate similarity scores (0.5-0.7) can indicate highly relevant data
+    - When you decide to show data to the user, ALWAYS use the display_dataframe_preview tool to show a formatted preview of the data
 
-    When you decide to show data to the user, ALWAYS use the display_dataframe_preview tool to show a formatted preview of the data.
+    COUNTRY-SPECIFIC QUERIES:
+    - When the user asks about a specific country (e.g., "inflation in India", "unemployment in Germany"), pay close attention to the country mentioned
+    - When using ingest_from_fred tool, ALWAYS specify the correct country parameter based on the user's query
+    - Examples: 
+      * "inflation in India" → use ingest_from_fred(query="inflation", country="India")
+      * "GDP growth in Japan" → use ingest_from_fred(query="GDP growth", country="Japan")
+      * "unemployment in Germany" → use ingest_from_fred(query="unemployment", country="Germany")
+    - If no country is mentioned, default to "USA"
 
     Always be helpful, clear, and explain what you're doing at each step.
 
@@ -85,16 +94,19 @@ query_agent:
     Return only the search terms, one per line.
 
   fred_query_rephrase_template: |
-    The user is looking for economic data with this query: "{query}"
+    The user is looking for economic data with this query: "{query}" for the country: "{country}"
     
     Rephrase this query to be more suitable for searching the FRED economic database.
     Focus on standard economic terminology and indicators that would likely exist in a central bank database.
+    IMPORTANT: Include the country "{country}" in your rephrased query to ensure country-specific results.
     
     Examples:
-    - "job market" → "employment statistics United States"
-    - "cost of living" → "consumer price index inflation"
+    - "job market" for "United States" → "employment statistics United States"
+    - "cost of living" for "Germany" → "consumer price index inflation Germany"
+    - "inflation" for "India" → "consumer price index India inflation rate"
+    - "GDP growth" for "Japan" → "gross domestic product Japan economic growth"
     
-    Return only the rephrased query.
+    Return only the rephrased query that includes the country name.
 
   max_search_attempts: 3
 
