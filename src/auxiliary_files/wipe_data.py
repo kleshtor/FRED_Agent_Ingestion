@@ -16,17 +16,17 @@ from typing import Dict
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from helper_functions.postgres_store import PostgresEmbeddingStore
-from helper_functions.path_config import SRC_DIR
+from helper_functions.core_utils import SRC_DIR
 
 
 def load_config() -> Dict:
     """
-    Load configuration from FRED.yaml file.
+    Load configuration from  file.
     
     Returns:
         Configuration dictionary
     """
-    config_path = os.path.join(SRC_DIR, "helper_functions", "FRED.yaml")
+    config_path = os.path.join(SRC_DIR, "helper_functions", "config.yaml")
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 

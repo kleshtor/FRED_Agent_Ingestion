@@ -12,16 +12,14 @@ from agents.tracing import set_tracing_disabled
 from pydantic import BaseModel
 
 # Local imports
-from helper_functions.search_and_query import search_and_query
-from helper_functions.extract_data import extract_data
+from helper_functions.data_operations import search_and_query, extract_data
 from helper_functions.postgres_store import PostgresEmbeddingStore
-from helper_functions.FRED_helper import (
+from helper_functions.fred_operations import (
     search_fred_series, fetch_series_data, process_dictionary_embeddings,
     load_existing_data_dictionary, indicator_exists_in_dictionary,
     merge_time_series_data, ensure_complete_date_range
 )
-from helper_functions.LLM_utils import LLMClient
-from helper_functions.path_config import SRC_DIR, PROMPT_YAML_PATH
+from helper_functions.core_utils import LLMClient, SRC_DIR, PROMPT_YAML_PATH
 
 
 class SearchDatabaseArgs(BaseModel):
@@ -65,7 +63,7 @@ class QueryAgent:
         print("   ✓ Environment variables loaded")
         
         # Set up paths
-        self.config_path = config_path or os.path.join(SRC_DIR, "helper_functions", "FRED.yaml")
+        self.config_path = config_path or os.path.join(SRC_DIR, "helper_functions", "config.yaml")
         self.prompt_path = prompt_path or PROMPT_YAML_PATH
         print(f"   ✓ Config path: {self.config_path}")
         print(f"   ✓ Prompt path: {self.prompt_path}")
