@@ -1,8 +1,8 @@
 metadata:
   version: "2.0"
-  author: "Aarushi A"
-  description: "Prompt configurations for FRED Agent SDK"
-  last_updated: "2025-07-22"
+  author: "Aarushi A & Anish B"
+  description: "Prompt configurations for FRED Agents"
+  last_updated: "2025-07-25"
 
 economic_indicators:
   system_instructions: |
@@ -27,7 +27,7 @@ economic_indicators:
   model_config:
     model: "gpt-4o"
     temperature: 0.2
-    max_tokens: 100
+    max_tokens: 150
 
 country_resolution:
   system_instructions: |
