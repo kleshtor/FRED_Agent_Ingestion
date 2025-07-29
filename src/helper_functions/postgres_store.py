@@ -29,7 +29,7 @@ class PostgresEmbeddingStore:
                     indicator_id TEXT PRIMARY KEY,
                     indicator_name TEXT NOT NULL,
                     description TEXT NOT NULL,
-                    embedding VECTOR(1536) NOT NULL,
+                    embedding VECTOR(3072) NOT NULL,
                     embedding_model TEXT NOT NULL,
                     created_at TIMESTAMPTZ DEFAULT NOW(),
                     updated_at TIMESTAMPTZ DEFAULT NOW()
