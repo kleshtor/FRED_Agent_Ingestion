@@ -1,0 +1,15 @@
+search_terms:
+  - term: "Inflation"
+  - term: "GDP per capita"
+  - term: "Trade"
+countries:
+  - "USA"  # United States
+  - "CHN"  # China
+  - "DEU"  # Germany
+  - "JPN"  # Japan
+  - "GBR"  # United Kingdom
+
+start_year: 2000
+end_year: 2023
+
+

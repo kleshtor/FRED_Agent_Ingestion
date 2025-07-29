@@ -1,0 +1,34 @@
+# World Bank Configuration File
+
+# Macroeconomic search terms (to be combined with each country)
+search_terms:
+  - term: "GDP per capita"
+  - term: "Inflation"
+  - term: "Trade"
+  - term: "Employment"
+  - term: "Investment"
+
+# Countries to fetch data for (using World Bank country codes)
+countries:
+  - "USA"  # United States
+  - "CHN"  # China
+  - "DEU"  # Germany
+  - "JPN"  # Japan
+  - "GBR"  # United Kingdom
+  - "CAN"  # Canada
+
+# Time range for data extraction
+start_year: 1960
+end_year: 2023
+
+# Output location for time series Excel + dictionary
+output_path: "excel-output/worldbank_macro_data.xlsx"
+
+# Database configuration for pgvector embedding storage
+database:
+  type: "postgres"
+  host: "localhost"
+  port: 5432
+  dbname: "fred_embeddings"     # Using same database as FRED for now
+  user: "postgres"               
+  password: "Kanha@0410" 

@@ -31,9 +31,22 @@ class PostgresEmbeddingStore:
                     description TEXT NOT NULL,
                     embedding VECTOR(1536) NOT NULL,
                     embedding_model TEXT NOT NULL,
+                    source TEXT DEFAULT 'FRED',
+                    geography TEXT,
+                    frequency TEXT,
                     created_at TIMESTAMPTZ DEFAULT NOW(),
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 );
+                
+                -- Add columns if they don't exist (for backward compatibility)
+                ALTER TABLE indicator_embeddings 
+                ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'FRED';
+                
+                ALTER TABLE indicator_embeddings 
+                ADD COLUMN IF NOT EXISTS geography TEXT;
+                
+                ALTER TABLE indicator_embeddings 
+                ADD COLUMN IF NOT EXISTS frequency TEXT;
             """)
             print("PostgreSQL schema ensured.")
 
@@ -68,6 +81,59 @@ class PostgresEmbeddingStore:
             except Exception as e:
                 print(f"Error saving embedding {indicator_id}: {e}")
                 return False
+
+    def store_embedding(self, text: str, metadata: Dict, model: str = "text-embedding-3-small") -> bool:
+        """
+        Store embedding with metadata support for both FRED and World Bank data
+        
+        Args:
+            text: The text to create embedding from
+            metadata: Dictionary containing indicator metadata
+            model: The embedding model to use
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        import openai
+        
+        try:
+            # Create embedding
+            client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            response = client.embeddings.create(input=text, model=model)
+            embedding = response.data[0].embedding
+            
+            # Store with metadata
+            with self.conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO indicator_embeddings (
+                        indicator_id, indicator_name, description, embedding, embedding_model, 
+                        source, geography, frequency, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (indicator_id) DO UPDATE SET
+                        indicator_name = EXCLUDED.indicator_name,
+                        description = EXCLUDED.description,
+                        embedding = EXCLUDED.embedding,
+                        embedding_model = EXCLUDED.embedding_model,
+                        source = EXCLUDED.source,
+                        geography = EXCLUDED.geography,
+                        frequency = EXCLUDED.frequency,
+                        updated_at = EXCLUDED.updated_at;
+                """, (
+                    metadata.get("indicator_id"),
+                    metadata.get("indicator_name"),
+                    text,  # Use the text as description
+                    embedding,
+                    model,
+                    metadata.get("source", "FRED"),
+                    metadata.get("geography"),
+                    metadata.get("frequency"),
+                    datetime.utcnow()
+                ))
+                return True
+                
+        except Exception as e:
+            print(f"Error storing embedding for {metadata.get('indicator_id', 'unknown')}: {e}")
+            return False
 
     def save_embeddings_batch(self, records: List[Dict], model: str = "text-embedding-3-small") -> int:
         if not records:
@@ -105,13 +171,15 @@ class PostgresEmbeddingStore:
             self.conn.close()
             print("🔌 PostgreSQL connection closed.")
 
-    def search_similar_embeddings(self, query_embedding: List[float], top_k: int = 3) -> List[Dict]:
+    def search_similar_embeddings(self, query_embedding: List[float], top_k: int = 3, 
+                                  filter_metadata: Optional[Dict] = None) -> List[Dict]:
         """
         Search for the most similar embeddings using cosine distance.
         
         Args:
             query_embedding: The embedding vector to search for
             top_k: Number of top matches to return
+            filter_metadata: Optional dictionary to filter results by metadata (e.g., {"source": "World Bank"})
             
         Returns:
             List of dictionaries containing similar indicators with similarity scores
@@ -121,19 +189,41 @@ class PostgresEmbeddingStore:
                 # Convert query embedding to proper vector format
                 query_vector = f"[{','.join(map(str, query_embedding))}]"
                 
-                # Use cosine distance for similarity search with explicit casting
-                cur.execute("""
+                # Build WHERE clause and parameters separately
+                where_clause = ""
+                filter_params = []
+                
+                if filter_metadata:
+                    conditions = []
+                    for key, value in filter_metadata.items():
+                        if key in ['source', 'geography', 'frequency']:
+                            conditions.append(f"{key} = %s")
+                            filter_params.append(value)
+                    
+                    if conditions:
+                        where_clause = "WHERE " + " AND ".join(conditions)
+                
+                # Build the SQL query
+                base_query = f"""
                     SELECT 
                         indicator_id,
                         indicator_name,
                         description,
+                        source,
+                        geography,
+                        frequency,
                         embedding <=> %s::vector AS distance,
                         1 - (embedding <=> %s::vector) AS similarity
                     FROM indicator_embeddings 
+                    {where_clause}
                     ORDER BY embedding <=> %s::vector 
-                    LIMIT %s;
-                """, (query_vector, query_vector, query_vector, top_k))
+                    LIMIT %s
+                """
                 
+                # Build final parameters: 3 query_vectors + filter_params + limit
+                final_params = [query_vector, query_vector, query_vector] + filter_params + [top_k]
+                
+                cur.execute(base_query, final_params)
                 results = cur.fetchall()
                 
                 # Convert results to list of dictionaries
@@ -143,8 +233,11 @@ class PostgresEmbeddingStore:
                         "indicator_id": row[0],
                         "indicator_name": row[1], 
                         "description": row[2],
-                        "distance": float(row[3]),
-                        "similarity": float(row[4])
+                        "source": row[3],
+                        "geography": row[4],
+                        "frequency": row[5],
+                        "distance": float(row[6]),
+                        "similarity": float(row[7])
                     })
                 
                 return similar_indicators
