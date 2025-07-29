@@ -28,19 +28,24 @@ def load_config() -> Dict:
 
 # ===== SEARCH AND QUERY OPERATIONS =====
 
-def create_query_embedding(query: str, model: str = "text-embedding-3-small") -> List[float]:
+def create_query_embedding(query: str, model: Optional[str] = None) -> List[float]:
     """
-    Convert a text query into an embedding vector using OpenAI.
+    Convert a text query into an embedding vector using OpenAI. 
     
     Args:
         query: The text query to convert to embedding
-        model: The OpenAI embedding model to use
+        model: The OpenAI embedding model to use (if None, uses config default)
         
     Returns:
         List of floats representing the embedding vector
     """
     # Load environment variables for OpenAI API key
     load_dotenv()
+    
+    # Load configuration to get default embedding model
+    if model is None:
+        config = load_config()
+        model = config.get("embedding", {}).get("model", "text-embedding-3-large")
     
     # Initialize OpenAI client
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

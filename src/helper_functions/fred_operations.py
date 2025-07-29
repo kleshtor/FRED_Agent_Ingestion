@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from pandas_datareader import data as web
 from fredapi import Fred
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import openai
 import yaml
@@ -156,7 +156,25 @@ def process_country_terms(country: str, terms: List[str], api_key: str,
 
     return data_by_freq, dictionary_rows
 
-def process_dictionary_embeddings(dict_file_path: str, embedding_store, model: str = "text-embedding-3-small") -> dict:
+def process_dictionary_embeddings(dict_file_path: str, embedding_store, model: Optional[str] = None) -> dict:
+    """
+    Process dictionary entries and create embeddings for descriptions.
+    
+    Args:
+        dict_file_path: Path to the Excel dictionary file
+        embedding_store: PostgreSQL embedding store instance
+        model: Embedding model to use (if None, uses config default)
+        
+    Returns:
+        Dictionary with processing statistics
+    """
+    # Load configuration to get default embedding model
+    if model is None:
+        config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        model = config.get("embedding", {}).get("model", "text-embedding-3-large")
+    
     df = pd.read_excel(dict_file_path)
     stats = {"total": len(df), "processed": 0, "skipped": 0, "errors": 0}
 

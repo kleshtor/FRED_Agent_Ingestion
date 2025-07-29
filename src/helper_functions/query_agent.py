@@ -51,16 +51,8 @@ class QueryAgent:
     and ingest new data from FRED as needed.
     """
     
-    def __init__(self, config_path: str = None, prompt_path: str = None):
+    def __init__(self, config_path: str = None, prompt_path: str = None, verbose: bool = None):
         print("🔧 Initializing QueryAgent...")
-        
-        # Disable tracing to clean up output
-        set_tracing_disabled(True)
-        print("   ✓ Tracing disabled for cleaner output")
-        
-        # Load environment variables
-        load_dotenv()
-        print("   ✓ Environment variables loaded")
         
         # Set up paths
         self.config_path = config_path or os.path.join(SRC_DIR, "helper_functions", "config.yaml")
@@ -68,8 +60,31 @@ class QueryAgent:
         print(f"   ✓ Config path: {self.config_path}")
         print(f"   ✓ Prompt path: {self.prompt_path}")
         
-        # Load configuration and prompts
+        # Load configuration first to get verbosity setting
         self._load_config()
+        
+        # Determine verbosity: explicit parameter overrides config, otherwise use config
+        if verbose is not None:
+            self.verbose = verbose
+            print(f"   🔍 Verbose mode set to: {verbose} (from parameter)")
+        else:
+            self.verbose = self.agent_config.get("verbose", False)
+            print(f"   🔍 Verbose mode set to: {self.verbose} (from config)")
+        
+        # Configure tracing based on verbose mode
+        if self.verbose:
+            print("   🔍 Verbose mode enabled - agent thinking will be visible")
+            # Don't disable tracing - let it show the agent's thought process
+        else:
+            # Disable tracing to clean up output
+            set_tracing_disabled(True)
+            print("   ✓ Tracing disabled for cleaner output")
+        
+        # Load environment variables
+        load_dotenv()
+        print("   ✓ Environment variables loaded")
+        
+        # Load prompts
         self._load_prompts()
         
         # Initialize components
@@ -96,6 +111,7 @@ class QueryAgent:
         
         self.api_key = config.get("api_key")
         self.db_config = config.get("database", {})
+        self.agent_config = config.get("agent", {})
         self.dict_file_path = os.path.join(SRC_DIR, "excel-output", "FRED_DataDictionary.xlsx")
         
         print(f"   ✓ FRED API key loaded: {'***' + self.api_key[-4:] if self.api_key else 'MISSING'}")
@@ -111,12 +127,12 @@ class QueryAgent:
         with open(self.prompt_path, 'r', encoding='utf-8') as f:
             prompts = yaml.safe_load(f)
         
-        self.agent_config = prompts.get("query_agent", {})
-        self.max_search_attempts = self.agent_config.get("max_search_attempts", 3)
+        self.prompt_config = prompts.get("query_agent", {})
+        self.max_search_attempts = self.prompt_config.get("max_search_attempts", 3)
         
         print(f"   ✓ Agent prompts loaded")
         print(f"   ✓ Max search attempts: {self.max_search_attempts}")
-        print(f"   ✓ Available prompt templates: {list(self.agent_config.keys())}")
+        print(f"   ✓ Available prompt templates: {list(self.prompt_config.keys())}")
     
     def _create_agent(self) -> Agent:
         """Create the OpenAI Agent with tools"""
@@ -129,7 +145,7 @@ class QueryAgent:
             """
             print(f"\n🔍 TOOL CALLED: search_database(query='{query}', max_attempts={max_attempts})")
             print("   📋 Tool Purpose: Find economic indicators in local database using semantic search")
-            return self._search_database_impl(query, max_attempts)
+            return self._search_database_implementation(query, max_attempts)
         
         @function_tool
         def extract_data(indicator_id: str) -> str:
@@ -139,7 +155,7 @@ class QueryAgent:
             """
             print(f"\n📊 TOOL CALLED: extract_data(indicator_id='{indicator_id}')")
             print("   📋 Tool Purpose: Extract raw time series data and metadata for specific indicator")
-            return self._extract_data_impl(indicator_id)
+            return self._extract_data_implementation(indicator_id)
         
         @function_tool
         def display_dataframe_preview(indicator_id: str, preview_rows: int = 10) -> str:
@@ -149,7 +165,7 @@ class QueryAgent:
             """
             print(f"\n📈 TOOL CALLED: display_dataframe_preview(indicator_id='{indicator_id}', preview_rows={preview_rows})")
             print("   📋 Tool Purpose: Create formatted preview of time series data for user display")
-            return self._display_dataframe_preview_impl(indicator_id, preview_rows)
+            return self._display_dataframe_preview_implementation(indicator_id, preview_rows)
         
         @function_tool
         def ingest_from_fred(query: str, country: str = "USA") -> str:
@@ -159,10 +175,10 @@ class QueryAgent:
             """
             print(f"\n🌐 TOOL CALLED: ingest_from_fred(query='{query}', country='{country}')")
             print("   📋 Tool Purpose: Search FRED database for new indicators and ingest them locally")
-            return self._ingest_from_fred_impl(query, country)
+            return self._ingest_from_fred_implementation(query, country)
         
         # Get agent instructions from YAML configuration
-        agent_instructions = self.agent_config.get("QueryAgent_Instructions", "")
+        agent_instructions = self.prompt_config.get("QueryAgent_Instructions", "")
         print(f"   ✓ Agent instructions loaded ({len(agent_instructions)} characters)")
         
         agent = Agent(
@@ -173,7 +189,7 @@ class QueryAgent:
         
         return agent
     
-    def _search_database_impl(self, query: str, max_attempts: int = 3) -> str:
+    def _search_database_implementation(self, query: str, max_attempts: int = 3) -> str:
         """Implementation of database search - returns all results for agent evaluation"""
         try:
             print(f"🔍 Starting database search for: '{query}'")
@@ -273,7 +289,7 @@ class QueryAgent:
             print(f"   🚨 {error_msg}")
             return error_msg
     
-    def _extract_data_impl(self, indicator_id: str) -> str:
+    def _extract_data_implementation(self, indicator_id: str) -> str:
         """Implementation of data extraction"""
         try:
             print(f"📊 Extracting data for indicator: {indicator_id}")
@@ -317,7 +333,7 @@ class QueryAgent:
             print(f"   🚨 {error_msg}")
             return error_msg
     
-    def _display_dataframe_preview_impl(self, indicator_id: str, preview_rows: int = 10) -> str:
+    def _display_dataframe_preview_implementation(self, indicator_id: str, preview_rows: int = 10) -> str:
         """Implementation of dataframe preview display"""
         try:
             print(f"📈 Creating formatted preview for indicator: {indicator_id}")
@@ -411,7 +427,7 @@ class QueryAgent:
             print(f"   🚨 {error_msg}")
             return error_msg
     
-    def _ingest_from_fred_impl(self, query: str, country: str = "USA") -> str:
+    def _ingest_from_fred_implementation(self, query: str, country: str = "USA") -> str:
         """Implementation of FRED data ingestion with full time series data"""
         try:
             print(f"🌐 Starting FRED ingestion process...")
@@ -598,14 +614,14 @@ class QueryAgent:
         """Generate search variations using LLM"""
         try:
             print(f"   🧠 Generating search variations for: '{query}'")
-            template = self.agent_config.get("search_variations_template", "")
+            template = self.prompt_config.get("search_variations_template", "")
             prompt = template.format(query=query)
             
             # Use LLM to generate variations
             response = self.llm_client.client.chat.completions.create(
-                model=self.agent_config["model_config"].get("model", "gpt-4o"),
-                temperature=self.agent_config["model_config"].get("temperature", 0.3),
-                max_tokens=self.agent_config["model_config"].get("max_tokens", 150),
+                model=self.prompt_config["model_config"].get("model", "gpt-4o"),
+                temperature=self.prompt_config["model_config"].get("temperature", 0.3),
+                max_tokens=self.prompt_config["model_config"].get("max_tokens", 150),
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
@@ -631,13 +647,13 @@ class QueryAgent:
         """Rephrase query for FRED database search with country context"""
         try:
             print(f"   🧠 Rephrasing query for FRED: '{query}' (country: {country})")
-            template = self.agent_config.get("fred_query_rephrase_template", "")
+            template = self.prompt_config.get("fred_query_rephrase_template", "")
             prompt = template.format(query=query, country=country)
             
             response = self.llm_client.client.chat.completions.create(
-                model=self.agent_config["model_config"].get("model", "gpt-4o"),
-                temperature=self.agent_config["model_config"].get("temperature", 0.3),
-                max_tokens=self.agent_config["model_config"].get("max_tokens", 150),
+                model=self.prompt_config["model_config"].get("model", "gpt-4o"),
+                temperature=self.prompt_config["model_config"].get("temperature", 0.3),
+                max_tokens=self.prompt_config["model_config"].get("max_tokens", 150),
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
@@ -725,10 +741,12 @@ async def main():
         "Employment trends in manufacturing"
     ]
     
-    # Initialize agent
+    # Initialize agent (verbosity controlled by config.yaml)
     agent = QueryAgent()
     
     print("🚀 FRED Query Agent initialized!")
+    if agent.verbose:
+        print("🔍 VERBOSE MODE: You will see the agent's thinking process and tool calls")
     print("=" * 60)
     
     # Interactive mode

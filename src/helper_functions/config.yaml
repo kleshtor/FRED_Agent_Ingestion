@@ -13,6 +13,14 @@ countries:
 # Output location for time series Excel + dictionary
 output_path: "excel-output/fred_macro_data.xlsx"
 
+# Embedding model configuration
+embedding:
+  model: "text-embedding-3-small"
+
+# Agent verbosity configuration
+agent:
+  verbose: false
+
 # Database configuration for pgvector embedding storage
 database:
 database:
