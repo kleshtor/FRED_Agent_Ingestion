@@ -21,12 +21,16 @@ from helper_functions.core_utils import SRC_DIR
 
 def load_config() -> Dict:
     """
-    Load configuration from  file.
+    Load configuration from config file.
     
     Returns:
         Configuration dictionary
     """
-    config_path = os.path.join(SRC_DIR, "helper_functions", "config.yaml")
+    # Get the path to the config file relative to the current script location
+    current_dir = os.path.dirname(__file__)  # auxiliary_files directory
+    config_path = os.path.join(current_dir, '..', 'helper_functions', 'config.yaml')
+    config_path = os.path.abspath(config_path)  # Resolve to absolute path
+    
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
@@ -92,7 +96,10 @@ def wipe_excel_files() -> bool:
         True if successful, False otherwise
     """
     try:
-        excel_output_dir = os.path.join(SRC_DIR, "excel-output")
+        # Get the path to excel-output directory relative to the current script location
+        current_dir = os.path.dirname(__file__)  # auxiliary_files directory
+        excel_output_dir = os.path.join(current_dir, '..', 'excel-output')
+        excel_output_dir = os.path.abspath(excel_output_dir)  # Resolve to absolute path
         
         if not os.path.exists(excel_output_dir):
             print("Excel output directory doesn't exist - nothing to delete.")
