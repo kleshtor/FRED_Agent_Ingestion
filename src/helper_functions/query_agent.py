@@ -33,8 +33,8 @@ class ExtractDataArgs(BaseModel):
     indicator_id: str
 
 
-class DelegateToFredAgentArgs(BaseModel):
-    """Arguments for delegating to FRED Agent"""
+class DelegateToSearchAndIngestAgentArgs(BaseModel):
+    """Arguments for delegating to Search and Ingest Agent"""
     query: str
     country: str = "USA"
 
@@ -96,16 +96,16 @@ class QueryAgent:
         self.llm_client = LLMClient(self.prompt_path)
         print("   ✓ LLM client ready")
         
-        # Initialize FRED Agent for workflow delegation
-        print("   🏗️ Initializing FRED Agent for delegation...")
-        from helper_functions.fred_operations import FredAgent
-        self.fred_agent = FredAgent(self.config_path, self.prompt_path)
-        print("   ✓ FRED Agent ready for workflow delegation")
+        # Initialize Search and Ingest Agent for workflow delegation
+        print("   🏗️ Initializing Search and Ingest Agent for delegation...")
+        from helper_functions.search_and_ingest_agent import SearchAndIngestAgent
+        self.search_and_ingest_agent = SearchAndIngestAgent(self.config_path, self.prompt_path)
+        print("   ✓ Search and Ingest Agent ready for workflow delegation")
         
         # Create the agent with tools
         print("   🛠️ Creating agent with tools...")
         self.agent = self._create_agent()
-        print("   ✓ Agent created with 4 tools: search_database, extract_data, display_dataframe_preview, delegate_to_fred_agent")
+        print("   ✓ Agent created with 4 tools: search_database, extract_data, display_dataframe_preview, delegate_to_search_and_ingest_agent")
         
         print("✅ QueryAgent initialization complete!")
     
@@ -174,15 +174,15 @@ class QueryAgent:
             return self._display_dataframe_preview_implementation(indicator_id, preview_rows)
         
         @function_tool
-        def delegate_to_fred_agent(query: str, country: str = "USA") -> str:
+        def delegate_to_search_and_ingest_agent(query: str, country: str = "USA") -> str:
             """
-            Delegate to FRED Agent to search and ingest new economic indicators from FRED database.
+            Delegate to Search and Ingest Agent to search and ingest new economic indicators from FRED database.
             Use this when no relevant indicators are found in the local database search.
             After delegation, you should search the database again to find the newly ingested data.
             """
-            print(f"\n🤝 TOOL CALLED: delegate_to_fred_agent(query='{query}', country='{country}')")
-            print("   📋 Tool Purpose: Delegate to FRED Agent for specialized data ingestion")
-            return self._delegate_to_fred_agent_implementation(query, country)
+            print(f"\n🤝 TOOL CALLED: delegate_to_search_and_ingest_agent(query='{query}', country='{country}')")
+            print("   📋 Tool Purpose: Delegate to Search and Ingest Agent for specialized data ingestion")
+            return self._delegate_to_search_and_ingest_agent_implementation(query, country)
         
         # Get agent instructions from YAML configuration
         agent_instructions = self.prompt_config.get("QueryAgent_Instructions", "")
@@ -191,7 +191,7 @@ class QueryAgent:
         agent = Agent(
             name="FRED Query Agent",
             instructions=agent_instructions,
-            tools=[search_database, extract_data, display_dataframe_preview, delegate_to_fred_agent]
+            tools=[search_database, extract_data, display_dataframe_preview, delegate_to_search_and_ingest_agent]
         )
         
         return agent
@@ -434,20 +434,20 @@ class QueryAgent:
             print(f"   🚨 {error_msg}")
             return error_msg
     
-    def _delegate_to_fred_agent_implementation(self, query: str, country: str = "USA") -> str:
-        """Implementation of workflow delegation to FRED Agent"""
+    def _delegate_to_search_and_ingest_agent_implementation(self, query: str, country: str = "USA") -> str:
+        """Implementation of workflow delegation to Search and Ingest Agent"""
         try:
-            print(f"🤝 **DELEGATING TO FRED AGENT**")
+            print(f"🤝 **DELEGATING TO SEARCH AND INGEST AGENT**")
             print(f"   📝 Query: '{query}'") 
             print(f"   🌍 Country: '{country}'")
             print(f"   🎯 Purpose: Specialized ingestion workflow")
-            print("   ⏳ Handing off to FRED Agent...")
+            print("   ⏳ Handing off to Search and Ingest Agent...")
             
-            # Delegate to FRED Agent
-            result = self.fred_agent.ingest_specific_indicators(query, country)
+            # Delegate to Search and Ingest Agent
+            result = self.search_and_ingest_agent.ingest_specific_indicators(query, country)
             
             if result["success"]:
-                response = f"✅ **FRED AGENT DELEGATION SUCCESSFUL**\n\n"
+                response = f"✅ **SEARCH AND INGEST AGENT DELEGATION SUCCESSFUL**\n\n"
                 response += f"**DELEGATION SUMMARY:**\n"
                 response += f"- Query: '{result['query']}'\n"
                 response += f"- Country: '{result['country']}' → '{result['normalized_country']}'\n"
@@ -464,7 +464,7 @@ class QueryAgent:
                 print("📋 QueryAgent should now search database again for newly ingested data")
                 return response
             else:
-                error_response = f"❌ **FRED AGENT DELEGATION FAILED**\n\n"
+                error_response = f"❌ **SEARCH AND INGEST AGENT DELEGATION FAILED**\n\n"
                 error_response += f"**ERROR DETAILS:**\n"
                 error_response += f"- Query: '{result['query']}'\n"
                 error_response += f"- Country: '{result['country']}'\n"
