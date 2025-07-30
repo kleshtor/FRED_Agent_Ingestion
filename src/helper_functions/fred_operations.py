@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from helper_functions.postgres_store import PostgresEmbeddingStore
 from helper_functions.core_utils import LLMClient
 
+# ===== FRED CONSTANTS =====
+
 STANDARD_START_DATE = "1900-01-01"
 VALID_FREQ = {"Monthly": "M", "Quarterly": "Q", "Annual": "A"}
 llm_client = LLMClient()
