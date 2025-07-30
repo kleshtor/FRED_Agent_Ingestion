@@ -10,7 +10,7 @@ search_terms:
 countries:
   - "USA"
 
-# Output location for time series Excel + dictionary
+# Output location for time series Excel + dictionary (relative to src/)
 output_path: "excel-output/fred_macro_data.xlsx"
 
 # Embedding model configuration

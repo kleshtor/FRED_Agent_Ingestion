@@ -33,8 +33,8 @@ class ExtractDataArgs(BaseModel):
     indicator_id: str
 
 
-class IngestFromFredArgs(BaseModel):
-    """Arguments for FRED ingestion tool"""
+class DelegateToFredAgentArgs(BaseModel):
+    """Arguments for delegating to FRED Agent"""
     query: str
     country: str = "USA"
 
@@ -96,10 +96,16 @@ class QueryAgent:
         self.llm_client = LLMClient(self.prompt_path)
         print("   ✓ LLM client ready")
         
+        # Initialize FRED Agent for workflow delegation
+        print("   🏗️ Initializing FRED Agent for delegation...")
+        from helper_functions.fred_operations import FredAgent
+        self.fred_agent = FredAgent(self.config_path, self.prompt_path)
+        print("   ✓ FRED Agent ready for workflow delegation")
+        
         # Create the agent with tools
         print("   🛠️ Creating agent with tools...")
         self.agent = self._create_agent()
-        print("   ✓ Agent created with 4 tools: search_database, extract_data, display_dataframe_preview, ingest_from_fred")
+        print("   ✓ Agent created with 4 tools: search_database, extract_data, display_dataframe_preview, delegate_to_fred_agent")
         
         print("✅ QueryAgent initialization complete!")
     
@@ -168,14 +174,15 @@ class QueryAgent:
             return self._display_dataframe_preview_implementation(indicator_id, preview_rows)
         
         @function_tool
-        def ingest_from_fred(query: str, country: str = "USA") -> str:
+        def delegate_to_fred_agent(query: str, country: str = "USA") -> str:
             """
-            Search FRED database and ingest new economic indicators with full time series data.
-            Returns status of ingestion process.
+            Delegate to FRED Agent to search and ingest new economic indicators from FRED database.
+            Use this when no relevant indicators are found in the local database search.
+            After delegation, you should search the database again to find the newly ingested data.
             """
-            print(f"\n🌐 TOOL CALLED: ingest_from_fred(query='{query}', country='{country}')")
-            print("   📋 Tool Purpose: Search FRED database for new indicators and ingest them locally")
-            return self._ingest_from_fred_implementation(query, country)
+            print(f"\n🤝 TOOL CALLED: delegate_to_fred_agent(query='{query}', country='{country}')")
+            print("   📋 Tool Purpose: Delegate to FRED Agent for specialized data ingestion")
+            return self._delegate_to_fred_agent_implementation(query, country)
         
         # Get agent instructions from YAML configuration
         agent_instructions = self.prompt_config.get("QueryAgent_Instructions", "")
@@ -184,7 +191,7 @@ class QueryAgent:
         agent = Agent(
             name="FRED Query Agent",
             instructions=agent_instructions,
-            tools=[search_database, extract_data, display_dataframe_preview, ingest_from_fred]
+            tools=[search_database, extract_data, display_dataframe_preview, delegate_to_fred_agent]
         )
         
         return agent
@@ -272,7 +279,7 @@ class QueryAgent:
                 response += "**AGENT DECISION REQUIRED:**\n"
                 response += "Evaluate the above indicators intelligently. If any seem relevant to the user's query "
                 response += "(based on name/description, not just similarity score), use display_dataframe_preview "
-                response += "to show the data. If none are relevant, consider using ingest_from_fred to find new data."
+                response += "to show the data. If none are relevant, consider using delegate_to_fred_agent to find new data."
                 
                 print(f"   ✅ Returning comprehensive results to agent for intelligent evaluation")
                 return response
@@ -281,7 +288,7 @@ class QueryAgent:
                 response = f"❌ **NO RESULTS FOUND**\n"
                 response += f"Searched {search_attempts} variations of the query but found no matching indicators.\n"
                 response += f"Variations tried: {variations}\n\n"
-                response += "**RECOMMENDATION:** Use ingest_from_fred tool to search FRED database for new data."
+                response += "**RECOMMENDATION:** Use delegate_to_fred_agent tool to search FRED database for new data."
                 return response
                 
         except Exception as e:
@@ -427,187 +434,51 @@ class QueryAgent:
             print(f"   🚨 {error_msg}")
             return error_msg
     
-    def _ingest_from_fred_implementation(self, query: str, country: str = "USA") -> str:
-        """Implementation of FRED data ingestion with full time series data"""
+    def _delegate_to_fred_agent_implementation(self, query: str, country: str = "USA") -> str:
+        """Implementation of workflow delegation to FRED Agent"""
         try:
-            print(f"🌐 Starting FRED ingestion process...")
-            print(f"   🎯 Query: '{query}'")
-            print(f"   🌍 Country: {country}")
-            print(f"   📋 Goal: Find new economic indicators from FRED database")
+            print(f"🤝 **DELEGATING TO FRED AGENT**")
+            print(f"   📝 Query: '{query}'") 
+            print(f"   🌍 Country: '{country}'")
+            print(f"   🎯 Purpose: Specialized ingestion workflow")
+            print("   ⏳ Handing off to FRED Agent...")
             
-            # Rephrase query for FRED search
-            print("   🧠 Step 1: Rephrasing query for FRED database using LLM...")
-            fred_query = self._rephrase_for_fred(query, country)
-            print(f"   ✅ Original query: '{query}'")
-            print(f"   ✅ Target country: '{country}'")
-            print(f"   ✅ FRED-optimized query: '{fred_query}'")
+            # Delegate to FRED Agent
+            result = self.fred_agent.ingest_specific_indicators(query, country)
             
-            # Search FRED
-            print(f"   🔍 Step 2: Searching FRED database...")
-            results = search_fred_series(fred_query, self.api_key, max_results=10)
-            
-            if results.empty:
-                error_msg = f"❌ No results found in FRED for query: '{fred_query}'"
-                print(f"   🚨 {error_msg}")
-                print("   💡 Try rephrasing your query or using more general economic terms")
-                return error_msg
-            
-            print(f"   ✅ Found {len(results)} potential indicators in FRED")
-            
-            # Process and ingest the results with full time series data
-            print("   🔄 Step 3: Processing and filtering results...")
-            ingested_count = 0
-            normalized_country = self.llm_client.normalize_country(country)
-            existing_dict = load_existing_data_dictionary(self.dict_file_path)
-            
-            print(f"   ✅ Target country normalized to: '{normalized_country}'")
-            print(f"   📚 Existing dictionary has {len(existing_dict)} indicators")
-            
-            new_indicators = []
-            
-            # Initialize data storage by frequency
-            data_by_freq = {"M": {}, "Q": {}, "A": {}}
-            
-            for idx, row in results.iterrows():
-                series_id = row.get("id")
-                title = row.get("title")
-                frequency = row.get("frequency")
+            if result["success"]:
+                response = f"✅ **FRED AGENT DELEGATION SUCCESSFUL**\n\n"
+                response += f"**DELEGATION SUMMARY:**\n"
+                response += f"- Query: '{result['query']}'\n"
+                response += f"- Country: '{result['country']}' → '{result['normalized_country']}'\n"
+                response += f"- New Indicators Added: {result['new_indicators']}\n"
+                response += f"- Excel Files Created/Updated: {len(result['excel_files'])}\n"
+                if result['excel_files']:
+                    response += f"- Files: {', '.join(result['excel_files'])}\n"
+                response += f"- New Embeddings: {result['embedding_stats'].get('processed', 0)}\n\n"
+                response += "**IMPORTANT NEXT STEP:**\n"
+                response += "✅ **The database now contains new indicators! Search the database again** "
+                response += "using the search_database tool to find the newly ingested data and answer the user's query."
                 
-                print(f"\n   📊 Processing indicator {idx+1}/{len(results)}: {series_id}")
-                print(f"      📝 Title: {title}")
-                print(f"      📅 Frequency: {frequency}")
-                
-                if not all([series_id, title, frequency]):
-                    print("      ❌ Skipping: Missing required fields")
-                    continue
-                
-                # Check if already exists
-                if indicator_exists_in_dictionary(series_id, existing_dict):
-                    print("      ⏭️ Skipping: Already exists in local database")
-                    continue
-                
-                # Generate description
-                print("      🧠 Generating description using LLM...")
-                description = self.llm_client.generate_description(title, frequency, normalized_country)
-                print(f"      ✅ Description generated ({len(description)} chars)")
-                
-                # Map frequency
-                freq_map = {"Monthly": "M", "Quarterly": "Q", "Annual": "A"}
-                freq_code = freq_map.get(frequency)
-                
-                if freq_code:
-                    # Fetch the actual time series data
-                    print(f"      📈 Fetching time series data from FRED...")
-                    
-                    start_date = "1900-01-01"
-                    end_date = datetime.today().strftime("%Y-%m-%d")
-                    
-                    # Create label for the series
-                    label = title.split('(')[0].strip().replace(" ", "_") + f"_{freq_code}"
-                    
-                    # Fetch the time series data
-                    time_series_df = fetch_series_data(series_id, label, start_date, end_date, freq_code)
-                    
-                    if not time_series_df.empty:
-                        print(f"      ✅ Time series data fetched: {len(time_series_df)} observations")
-                        # Store in data_by_freq structure
-                        if freq_code not in data_by_freq:
-                            data_by_freq[freq_code] = {}
-                        data_by_freq[freq_code][label] = time_series_df
-                    else:
-                        print("      ⚠️ Warning: No time series data available")
-                    
-                    new_indicators.append({
-                        "Indicator Name": title,
-                        "Indicator ID": series_id,
-                        "Description": description,
-                        "Frequency": freq_code,
-                        "Geography": normalized_country
-                    })
-                    ingested_count += 1
-                    print(f"      ✅ Indicator processed successfully")
-                else:
-                    print(f"      ❌ Skipping: Unsupported frequency '{frequency}'")
-            
-            print(f"\n   📊 Processing complete: {ingested_count} new indicators ready for ingestion")
-            
-            if new_indicators:
-                print("   💾 Step 4: Updating local database...")
-                
-                # Update dictionary
-                new_df = pd.DataFrame(new_indicators)
-                
-                if os.path.exists(self.dict_file_path):
-                    existing_df = pd.read_excel(self.dict_file_path)
-                    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-                    print(f"      ✅ Updated existing dictionary: {len(existing_df)} → {len(combined_df)} indicators")
-                else:
-                    combined_df = new_df
-                    print(f"      ✅ Created new dictionary with {len(combined_df)} indicators")
-                
-                combined_df.to_excel(self.dict_file_path, index=False)
-                
-                # Create Excel files with time series data
-                print("   📁 Step 5: Creating/updating Excel files with time series data...")
-                excel_files_created = []
-                for freq_code, series_dict in data_by_freq.items():
-                    if series_dict:  # Only if we have data for this frequency
-                        freq_label = {"M": "Monthly", "Q": "Quarterly", "A": "Annual"}[freq_code]
-                        filename = f"excel-output/{normalized_country.replace(' ', '_')}_{freq_label}.xlsx"
-                        full_path = os.path.join(SRC_DIR, filename)
-                        
-                        print(f"      📊 Processing {freq_label} data ({len(series_dict)} series)...")
-                        
-                        # Load existing data if file exists
-                        if os.path.exists(full_path):
-                            existing_data = pd.read_excel(full_path, index_col=0, parse_dates=True)
-                            print(f"         📂 Loaded existing file with {len(existing_data.columns)} columns")
-                        else:
-                            existing_data = pd.DataFrame()
-                            print("         📄 Creating new file")
-                        
-                        # Merge all new series for this frequency
-                        combined_data = existing_data
-                        for label, series_df in series_dict.items():
-                            combined_data = merge_time_series_data(combined_data, series_df)
-                            print(f"         ✅ Merged series: {label}")
-                        
-                        # Ensure complete date range and save
-                        if not combined_data.empty:
-                            complete_data = ensure_complete_date_range(combined_data, freq_code, end_date)
-                            complete_data.to_excel(full_path, index=True)
-                            excel_files_created.append(filename)
-                            print(f"         💾 Saved: {filename} ({len(complete_data)} rows, {len(complete_data.columns)} columns)")
-                
-                # Generate embeddings
-                print("   🧠 Step 6: Generating embeddings for new indicators...")
-                stats = process_dictionary_embeddings(self.dict_file_path, self.embedding_store)
-                print(f"      ✅ Embeddings processed: {stats.get('processed', 0)} new, {stats.get('skipped', 0)} skipped")
-                
-                response = f"✅ **FRED INGESTION COMPLETED SUCCESSFULLY**\n\n"
-                response += f"**INGESTION SUMMARY:**\n"
-                response += f"- Original Query: '{query}'\n"
-                response += f"- FRED Query: '{fred_query}'\n"
-                response += f"- FRED Results Found: {len(results)}\n"
-                response += f"- New Indicators Added: {ingested_count}\n"
-                response += f"- Excel Files Created/Updated: {len(excel_files_created)}\n"
-                if excel_files_created:
-                    response += f"- Files: {', '.join(excel_files_created)}\n"
-                response += f"- New Embeddings Generated: {stats.get('processed', 0)}\n\n"
-                response += "**NEXT STEPS:**\n"
-                response += "The database now contains new economic indicators. You should search the database "
-                response += "again to find better matches for the user's original query."
-                
-                print("   🎉 FRED ingestion completed successfully!")
+                print("🎉 **DELEGATION COMPLETED SUCCESSFULLY**")
+                print("📋 QueryAgent should now search database again for newly ingested data")
                 return response
             else:
-                warning_msg = f"⚠️ No new indicators found - all {len(results)} results already exist in database"
-                print(f"   {warning_msg}")
-                return warning_msg
+                error_response = f"❌ **FRED AGENT DELEGATION FAILED**\n\n"
+                error_response += f"**ERROR DETAILS:**\n"
+                error_response += f"- Query: '{result['query']}'\n"
+                error_response += f"- Country: '{result['country']}'\n"
+                error_response += f"- Error: {result['error']}\n"
+                error_response += f"- Message: {result['message']}\n\n"
+                error_response += "**RECOMMENDATION:**\n"
+                error_response += "Try rephrasing the query with more specific economic terms or check if FRED has data for the requested country."
+                
+                print("❌ **DELEGATION FAILED**")
+                return error_response
                 
         except Exception as e:
-            error_msg = f"❌ Error during FRED ingestion: {str(e)}"
-            print(f"   🚨 {error_msg}")
+            error_msg = f"❌ **CRITICAL ERROR IN DELEGATION**: {str(e)}"
+            print(f"🚨 {error_msg}")
             return error_msg
     
     def _generate_search_variations(self, query: str) -> List[str]:
