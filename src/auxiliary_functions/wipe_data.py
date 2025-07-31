@@ -16,7 +16,7 @@ from typing import Dict
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from helper_functions.postgres_store import PostgresEmbeddingStore
-from helper_functions.core_utils import SRC_DIR
+from helper_functions.path_config import SRC_DIR
 
 
 def load_config() -> Dict:

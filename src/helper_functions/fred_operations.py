@@ -10,7 +10,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from helper_functions.postgres_store import PostgresEmbeddingStore
-from helper_functions.core_utils import LLMClient, SRC_DIR
+from helper_functions.llm_utils import LLMClient
+from helper_functions.path_config import SRC_DIR
 
 # ===== FRED CONSTANTS =====
 

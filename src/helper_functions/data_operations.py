@@ -6,7 +6,8 @@ import openai
 from dotenv import load_dotenv
 
 from helper_functions.postgres_store import PostgresEmbeddingStore
-from helper_functions.core_utils import SRC_DIR, LLMClient
+from helper_functions.llm_utils import LLMClient
+from helper_functions.path_config import SRC_DIR
 
 # Initialize LLM client for country normalization
 llm_client = LLMClient()

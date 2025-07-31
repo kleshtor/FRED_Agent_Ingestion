@@ -7,7 +7,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from helper_functions.postgres_store import PostgresEmbeddingStore
-from helper_functions.core_utils import LLMClient, SRC_DIR
+from helper_functions.llm_utils import LLMClient
+from helper_functions.path_config import SRC_DIR
 from helper_functions.fred_operations import (
     process_country_terms, process_dictionary_embeddings,
     load_existing_data_dictionary, ensure_complete_date_range,
@@ -56,7 +57,7 @@ class SearchAndIngestAgent:
         Main execution method that processes all countries and generates Excel files.
         Uses LLM-normalized country names for consistent file naming.
         """
-        from helper_functions.core_utils import LLMClient
+        from helper_functions.llm_utils import LLMClient
         llm_client = LLMClient()
         
         all_dict_rows = []
@@ -154,7 +155,7 @@ class SearchAndIngestAgent:
         Returns:
             Dictionary with ingestion results and statistics
         """
-        from helper_functions.core_utils import LLMClient
+        from helper_functions.llms_utils import LLMClient
         llm_client = LLMClient()
         
         print(f"\n🔄 **SEARCH AND INGEST AGENT REQUEST**")

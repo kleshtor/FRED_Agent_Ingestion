@@ -19,7 +19,8 @@ from helper_functions.fred_operations import (
     load_existing_data_dictionary, indicator_exists_in_dictionary,
     merge_time_series_data, ensure_complete_date_range
 )
-from helper_functions.core_utils import LLMClient, SRC_DIR, PROMPT_YAML_PATH
+from helper_functions.llm_utils import LLMClient
+from helper_functions.path_config import SRC_DIR, PROMPT_YAML_PATH
 
 
 class SearchDatabaseArgs(BaseModel):

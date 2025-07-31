@@ -3,12 +3,12 @@ api_key: "f5e34adf3cdbd05efe78ad89b84087c5"
 
 # Macroeconomic search terms (to be combined with each country)
 search_terms:
-  - term: "Employment"
+  - term: "inflation rate"
 
 
 # Countries to fetch data for
 countries:
-  - "USA"
+  - "China"
 
 # Output location for time series Excel + dictionary (relative to src/)
 output_path: "excel-output/fred_macro_data.xlsx"
