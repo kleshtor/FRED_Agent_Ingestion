@@ -155,7 +155,7 @@ class SearchAndIngestAgent:
         Returns:
             Dictionary with ingestion results and statistics
         """
-        from helper_functions.llms_utils import LLMClient
+        from helper_functions.llm_utils import LLMClient
         llm_client = LLMClient()
         
         print(f"\n🔄 **SEARCH AND INGEST AGENT REQUEST**")
